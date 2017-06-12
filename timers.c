@@ -1,6 +1,7 @@
 #include <xc.h>
 #include <dsp.h>
 #include "timers.h"
+#include "mode_bus.h"
 
 // PID
 extern tPID fooPID1;
@@ -29,13 +30,15 @@ extern int res1, res2, res3, res4;
 extern int res, cmd, cmdd, cmdg, spd;
 
 //Motors variable
-extern short aux;
-extern short aux2;
+extern unsigned short aux;
+extern unsigned short aux2;
 
 extern float qtmp1;
 extern float qtmp2;
 
 extern char cmdflag; //1 ubnt idle
+
+extern int dog;
 
 void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
     IFS0bits.T1IF = 0;
@@ -46,17 +49,17 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
     cmdd = aux2;
 
     //aux seems to be from 0 to 340 ??
-    if (cmdg > 250) cmdg = 250;
-    if (cmdd > 250) cmdd = 250;
+    // if (cmdg > 250) cmdg = 250; // mode 8b
+    // if (cmdd > 250) cmdd = 250; // mode 8b
 
     if (!(cmdflag & 0x40)) cmdg = -cmdg;
     if (!(cmdflag & 0x10)) cmdd = -cmdd;
 
-    if (!(cmdflag & 0x80)) {
+    if (!(cmdflag & 0x80)) {   // no PID
         	PIDInit(&fooPID1);
-                PIDInit(&fooPID2);
-                PIDInit(&fooPID3);
-                PIDInit(&fooPID4);
+            PIDInit(&fooPID2);
+            PIDInit(&fooPID3);
+            PIDInit(&fooPID4);
         if (aux != 0) {
             //channel 3 Av Gauche
             LATDbits.LATD6 = 1;
@@ -111,12 +114,14 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
 
         //0 to 5000
         //Ar Gauche
-        PDC1 = aux * 20;
+        // PDC1 = aux * 20;
+        PDC1 = (short) ((float)aux * 0.0763); // mode 16b
         //Av Gauche
         PDC3 = PDC1;
 
         //Ar Droite
-        PDC2 = aux2 * 20;
+        // PDC2 = aux2 * 20;
+        PDC2 = (short) ((float)aux2 * 0.0763); // mode 16b
         //Av Droite
         PDC4 = PDC2;
     } else {
@@ -127,14 +132,14 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
         //Gauche
         //Ar
        if (cmdg!=0) {
-        qtmp1 = (float) ((float) cmdg / (float) 250);
+        qtmp1 = (float) ((float) cmdg / (float) 65500);
         qtmp2 = (float) ((float) speed3 / (float) 100);
         fooPID1.controlReference = Q15(qtmp1);
         fooPID1.measuredOutput = Q15(qtmp2);
         PID(&fooPID1);
         res3 = Fract2Float(fooPID1.controlOutput)*5000; //max speed 60 tics at pwm 5000
         //Av
-        qtmp1 = (float) ((float) cmdg / (float) 250);
+        qtmp1 = (float) ((float) cmdg / (float) 65500);
         qtmp2 = (float) ((float) speed1 / (float) 100);
         fooPID2.controlReference = Q15(qtmp1);
         fooPID2.measuredOutput = Q15(qtmp2);
@@ -169,14 +174,15 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
        if (cmdd!=0) {
 	//Droit
         //Ar
-        qtmp1 = (float) ((float) cmdd / (float) 250);
+        // qtmp1 = (float) ((float) cmdd / (float) 250); ; mode 8b
+        qtmp1 = (float) ((float) cmdd / (float) 65500);
         qtmp2 = (float) ((float) speed2 / (float) 100);
         fooPID3.controlReference = Q15(qtmp1);
         fooPID3.measuredOutput = Q15(qtmp2);
         PID(&fooPID3);
         res2 = Fract2Float(fooPID3.controlOutput)*5000; //max speed 60 tics at pwm 5000
         //Av
-        qtmp1 = (float) ((float) cmdd / (float) 250);
+        qtmp1 = (float) ((float) cmdd / (float) 65500);
         qtmp2 = (float) ((float) speed4 / (float) 100);
         fooPID4.controlReference = Q15(qtmp1);
         fooPID4.measuredOutput = Q15(qtmp2);
@@ -209,6 +215,7 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
        res2=0.0;
        res4=0.0;
        }
+       
 
         //0 to 8000
         //Ar Gauche
@@ -220,6 +227,7 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
         PDC2 = abs(res2);
         //Av Droite
         PDC4 = abs(res4);
+        
     }//end else
 }
 
@@ -241,6 +249,12 @@ void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void) {
 
 void __attribute__((interrupt, no_auto_psv)) _T3Interrupt(void) {
     IFS0bits.T3IF = 0;
+}
+
+void __attribute__((interrupt, no_auto_psv)) _T4Interrupt(void) {
+    
+    dog++;
+    IFS1bits.T4IF = 0;
 }
 
 void Init_Timer1(void) {
@@ -274,4 +288,16 @@ void Init_Timer3(void) {
     TMR3 = 0x0000;
     PR3 = 6000; // 6000 Timer1 period register = 0.1 mS a 60 MIPS for 40mips 4000
     T3CONbits.TON = 1; // Enable Timer1 and start the counter
+}
+
+void Init_Timer4(void) {
+
+    T4CON = 0; // Timer reset //no divider
+    T4CONbits.TCKPS = 0b11; // /256
+    IFS1bits.T4IF = 0; // Reset Timer1 interrupt flag
+    IPC6bits.T4IP = 6; // Timer1 Interrupt priority level=4
+    IEC1bits.T4IE = 1; // Enable Timer1 interrupt
+    TMR4 = 0x0000;
+    PR4 = 2343; // period = 10ms
+    T4CONbits.TON = 1; // Enable Timer1 and start the counter
 }

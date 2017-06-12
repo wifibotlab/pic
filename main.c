@@ -81,8 +81,8 @@ unsigned char uart_m_buf[20];
 int uart_nchar = 0;
 
 //Motors variable
-short aux = 0;
-short aux2 = 0;
+unsigned short aux = 0;
+unsigned short aux2 = 0;
 
 //CRC 16 bits variables
 short mycrc = 0;
@@ -104,6 +104,9 @@ int speed2 = 0;
 int speed3 = 0;
 int speed4 = 0;
 
+signed char speedl;
+signed char speedr;
+
 long position1 = 0;
 long position2 = 0;
 long position3 = 0;
@@ -115,8 +118,8 @@ long positiontmp3 = 0;
 long positiontmp4 = 0;
 
 int dog = 0;
-short maxspeed = 360;
-short speedmarge = 20;
+unsigned short maxspeed = 65000;
+unsigned short speedmarge = 500;
 char cmdflag = 0; //1 ubnt idle
 char ch1 = 0;
 char ch2 = 0;
@@ -235,29 +238,13 @@ int main(void) {
     unsigned char capafiltretmp=0;
     unsigned char capafiltre=0;
     
+    double temp, hygro;
     
     init_pic();
-    init_I2C();
-    init_SHT21();
     
     char str[40];
-    float temp;
     
-    int i, nSum;
-    
-    while (0) { // for test only
-        
-        temp = get_SHT21_temp();
-        sprintf(str, "tmp = %lf\r\n", temp);
-        UART_str(str);
-        
-        temp = get_SHT21_humi();
-        sprintf(str, "hum = %lf\r\n", temp);
-        UART_str(str);
-         
-        __delay_ms(500);
-    }
-    
+    int i, nSum;    
     
     while (1) {
         
@@ -273,9 +260,6 @@ int main(void) {
         //X1-4 (IO7)
         LATEbits.LATE0 = ch1;//ch4;
 
-        
-        dog++;
-
         if (dog > modbus.wtd) {
 
             aux = 0x0000;
@@ -286,8 +270,6 @@ int main(void) {
         }
         
         __delay_ms(10);
-        
-        
 
         tmpadc0 = ReadADC(0); //Av droite ir ok
         tmpadc1 = ReadADC(1); //ar gauche
@@ -296,29 +278,70 @@ int main(void) {
         tmpadc3 = ReadADC(4); //ar droite
         tmpadc5 = ReadADC(5); //i
         
+
+        
         if (modbus.enable == 1) {
+            
+            { // PRE-CALC
+                
+                // CURRENT
+                cur_filtretmp = (unsigned char)(tmpadc5 >> 2);
+                cur_filtre = (unsigned char) (lp_filter2((unsigned char)(cur_filtretmp), u, y));
+                cur_filtretmp = (unsigned char) (lp_filter2((unsigned char)(cur_filtre), u2, y2));
+                
+                // SHT21
+                temp = get_SHT21_temp();
+                hygro = get_SHT21_hygro();
+                
+            }
             
             { // STREAM
                 
                 bufsend[0] = MODBUS_SYNC_BYTE;
-                bufsend[1] = 11;
+                bufsend[1] = 25;
                 bufsend[2] = MODBUS_STREAM;
                 
-                bufsend[3] = 123; // odom AV
-                bufsend[4] = 123; // odom AR
-                bufsend[5] = 123; // voltage
-                bufsend[6] = 123; // current
-                bufsend[7] = 123; // temp
-                bufsend[8] = 123; // hygro
-                bufsend[9] = 123; // speed av
-                bufsend[10] = 123; // speed ar
+                bufsend[3] = bufposition1[0]; // odom avg
+                bufsend[4] = bufposition1[1];
+                bufsend[5] = bufposition1[2];
+                bufsend[6] = bufposition1[3];
                 
-                for (i=0;i<11;i++)
+                bufsend[7]  = bufposition2[0]; // odom avd
+                bufsend[8]  = bufposition2[1];
+                bufsend[9]  = bufposition2[2];
+                bufsend[10] = bufposition2[3];
+               
+                bufsend[11] = bufposition3[0]; // odom arg
+                bufsend[12] = bufposition3[1];
+                bufsend[13] = bufposition3[2];
+                bufsend[14] = bufposition3[3];
+                
+                bufsend[15] = bufposition4[0]; // odom ard
+                bufsend[16] = bufposition4[1];
+                bufsend[17] = bufposition4[2];
+                bufsend[18] = bufposition4[3];
+                
+                bufsend[19] = (unsigned char) (tmpadc2 *10 ); // voltage   // 1u *10
+                bufsend[20] = (unsigned char) (cur_filtretmp *10); // current   // 1u *10
+                bufsend[21] = (unsigned char) (temp  *2);  // temp
+                bufsend[22] = (unsigned char) (hygro *2); // hygro
+                
+                bufsend[23] = speedl; // speed left  // 1s
+                bufsend[24] = speedr; // speed right // 1s
+                
+                for (i=0;i<25;i++)
                     WriteUART1(bufsend[i]);
                 
-                mycrc = crc16(bufsend+1, 10);
+                mycrc = crc16(bufsend+1, 24);
                 WriteUART1((unsigned char) mycrc);
                 WriteUART1((unsigned char) (mycrc >> 8));
+            }
+            
+            { // POST-CALC
+                
+                // CURRENT
+                cur_filtretmp = (unsigned char)(((double)cur_filtretmp/13.0)*10.0);
+                cur_check_lim = cur_filtretmp;
             }
                         
         }
@@ -571,6 +594,9 @@ void init_pic(void) {
     initPID();
     Init_Timer1();
     InitMCPWM();
+    init_I2C();
+    init_SHT21();
+    Init_Timer4(); // WTD
 
     //    InitUART1();
     //    InitUART2();
@@ -608,4 +634,7 @@ void init_pic(void) {
     modbus.speed_R = 0;
     
     modbus.wtd = 10;
+    
+    speedl = 0;
+    speedr = 0;
 }

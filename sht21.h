@@ -13,8 +13,8 @@
 #define SHT21_GET_RH_HOLD 0xE5
 
 void init_SHT21(void);
-float get_SHT21_temp(void);
-double get_SHT21_humi(void);
+double get_SHT21_temp(void);
+double get_SHT21_hygro(void);
 
 #endif	/* SHT21_H */
 

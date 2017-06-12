@@ -8,7 +8,7 @@ void init_SHT21(void) {
     I2C_write_byte(SHT21_ADDR, 0xE6, 0x01); // default mode
 }
 
-float get_SHT21_temp(void) {
+double get_SHT21_temp(void) {
     
     unsigned int raw;
     unsigned char raw_8b[3];
@@ -20,7 +20,7 @@ float get_SHT21_temp(void) {
     return ( -46.85 + 175.72 / 65536.0 * raw );
 }
 
-double get_SHT21_humi(void) {
+double get_SHT21_hygro(void) {
     
     unsigned int raw;
     unsigned char raw_8b[3];

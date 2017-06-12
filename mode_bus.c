@@ -7,8 +7,8 @@ extern short maxspeed;
 extern short speedmarge;
 
 //Motors variable
-extern short aux;
-extern short aux2;
+extern unsigned short aux;
+extern unsigned short aux2;
 
 extern char ch1;
 extern char ch2;
@@ -18,8 +18,6 @@ extern char ch4;
 extern int dog;
 
 void mode_bus(unsigned char *buff) {
-    
-    
     
     unsigned char cmdflag;
     
