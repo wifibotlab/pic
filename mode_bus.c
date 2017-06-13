@@ -17,9 +17,9 @@ extern char ch4;
 
 extern int dog;
 
+extern char cmdflag;
+
 void mode_bus(unsigned char *buff) {
-    
-    unsigned char cmdflag;
     
     switch (buff[2]) { // CMD
             
