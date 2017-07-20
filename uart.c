@@ -59,11 +59,11 @@ extern char ch4;
 void __attribute__((interrupt, no_auto_psv)) _U1RXInterrupt(void) {
     
     unsigned char ss;
-    while(U1STAbits.URXDA)
-    {
+    while(U1STAbits.URXDA) {
+        
     ss = ReadUART1();
 
-    if ((ss == MODBUS_SYNC_BYTE) && (uart_start == 0)) {
+    if ((ss == MODBUS_SYNC_BYTE) && (uart_start == 0)) { // modbus
 
         uart_nchar = 1;
         uart_start = 1;
@@ -71,16 +71,16 @@ void __attribute__((interrupt, no_auto_psv)) _U1RXInterrupt(void) {
         uart_m_buf[0] = ss;
         ss = 0;
         
+        maxspeed = 65000;
+        speedmarge = 500;
+        
 
     } else if (uart_start == 1 && modbus.enable == 1) {
         
         uart_m_buf[uart_nchar] = ss;
         ss = 0;
         
-        
         if (uart_nchar == (uart_m_buf[1]+1)) {
-            
-            
             
             crcR = crc16(uart_m_buf+1, uart_nchar-2);
             crcS = (short) uart_m_buf[uart_nchar-1] + (short) (uart_m_buf[uart_nchar] << 8);
@@ -90,7 +90,6 @@ void __attribute__((interrupt, no_auto_psv)) _U1RXInterrupt(void) {
                 // CRC OK !
                 mode_bus(uart_m_buf);
                 uart_start = 0;
-                
                 
             }
         }
@@ -106,11 +105,15 @@ void __attribute__((interrupt, no_auto_psv)) _U1RXInterrupt(void) {
     }
     
     
-    if ((ss == 255) && (uart_start == 0)) {
+    if ((ss == 255) && (uart_start == 0)) { // classic mode
         
         uart_nchar = 0;
         uart_start = 1;
         modbus.enable = 0;
+        
+        maxspeed = 360;
+        speedmarge = 20;
+        
 
     } else if (uart_start == 1 && modbus.enable == 0) {
 

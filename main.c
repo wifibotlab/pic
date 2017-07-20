@@ -118,8 +118,10 @@ long positiontmp3 = 0;
 long positiontmp4 = 0;
 
 int dog = 0;
-unsigned short maxspeed = 65000;
-unsigned short speedmarge = 500;
+// unsigned short maxspeed = 65000; // mlode 16b
+// unsigned short speedmarge = 500; // mlode 16b
+unsigned short maxspeed = 360;
+unsigned short speedmarge = 20;
 char cmdflag = 0; //1 ubnt idle
 char ch1 = 0;
 char ch2 = 0;
@@ -277,9 +279,7 @@ int main(void) {
         tmpadc4 = ReadADC(3); //av gauche ir ok
         tmpadc3 = ReadADC(4); //ar droite
         tmpadc5 = ReadADC(5); //i
-        
 
-        
         if (modbus.enable == 1) {
             
             { // PRE-CALC
@@ -321,8 +321,8 @@ int main(void) {
                 bufsend[17] = bufposition4[2];
                 bufsend[18] = bufposition4[3];
                 
-                bufsend[19] = (unsigned char) (tmpadc2 *10 ); // voltage   // 1u *10
-                bufsend[20] = (unsigned char) (cur_filtretmp *10); // current   // 1u *10
+                bufsend[19] = (unsigned char) (tmpadc2 >> 2 ); // voltage   // 1u /10
+                bufsend[20] = (unsigned char) (cur_filtretmp); // current   // 1u *10
                 bufsend[21] = (unsigned char) (temp  *2);  // temp
                 bufsend[22] = (unsigned char) (hygro *2); // hygro
                 

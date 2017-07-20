@@ -2,6 +2,7 @@
 #include <dsp.h>
 #include "timers.h"
 #include "mode_bus.h"
+#include "global.h"
 
 // PID
 extern tPID fooPID1;
@@ -49,8 +50,10 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
     cmdd = aux2;
 
     //aux seems to be from 0 to 340 ??
-    // if (cmdg > 250) cmdg = 250; // mode 8b
-    // if (cmdd > 250) cmdd = 250; // mode 8b
+    if ( ! modbus.enable) {
+        if (cmdg > 250) cmdg = 250; // mode 8b
+        if (cmdd > 250) cmdd = 250; // mode 8b
+    }
 
     if (!(cmdflag & 0x40)) cmdg = -cmdg;
     if (!(cmdflag & 0x10)) cmdd = -cmdd;
@@ -114,14 +117,24 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
 
         //0 to 5000
         //Ar Gauche
-        // PDC1 = aux * 20;
-        PDC1 = (short) ((float)aux * 0.0763); // mode 16b
+        if ( ! modbus.enable) {
+            PDC1 = aux * 20;
+        }
+        else {
+            PDC1 = aux * 0.0763;
+        }
+        //PDC1 = (short) ((float)aux * 0.0763); // mode 16b
         //Av Gauche
         PDC3 = PDC1;
 
         //Ar Droite
-        // PDC2 = aux2 * 20;
-        PDC2 = (short) ((float)aux2 * 0.0763); // mode 16b
+        if ( ! modbus.enable) {
+            PDC2 = aux2 * 20;
+        }
+        else {
+            PDC2 = aux2 * 0.0763;
+        }
+        //PDC2 = (short) ((float)aux2 * 0.0763); // mode 16b
         //Av Droite
         PDC4 = PDC2;
     } else {
@@ -132,14 +145,26 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
         //Gauche
         //Ar
        if (cmdg!=0) {
-        qtmp1 = (float) ((float) cmdg / (float) 65500);
+           
+        if ( ! modbus.enable) {
+            qtmp1 = (float) ((float) cmdd / (float) 250); // mode 8b
+        }
+        else {
+            qtmp1 = (float) ((float) cmdd / (float) 65500);
+        }
+        
         qtmp2 = (float) ((float) speed3 / (float) 100);
         fooPID1.controlReference = Q15(qtmp1);
         fooPID1.measuredOutput = Q15(qtmp2);
         PID(&fooPID1);
         res3 = Fract2Float(fooPID1.controlOutput)*5000; //max speed 60 tics at pwm 5000
         //Av
-        qtmp1 = (float) ((float) cmdg / (float) 65500);
+        if ( ! modbus.enable) {
+            qtmp1 = (float) ((float) cmdg / (float) 250); // mode 8b
+        }
+        else {
+            qtmp1 = (float) ((float) cmdg / (float) 65500);
+        }
         qtmp2 = (float) ((float) speed1 / (float) 100);
         fooPID2.controlReference = Q15(qtmp1);
         fooPID2.measuredOutput = Q15(qtmp2);
@@ -174,15 +199,25 @@ void __attribute__((interrupt, no_auto_psv)) _T1Interrupt(void) {
        if (cmdd!=0) {
 	//Droit
         //Ar
-        // qtmp1 = (float) ((float) cmdd / (float) 250); ; mode 8b
-        qtmp1 = (float) ((float) cmdd / (float) 65500);
+           
+        if ( ! modbus.enable) {
+            qtmp1 = (float) ((float) cmdd / (float) 250); // mode 8b
+        }
+        else {
+            qtmp1 = (float) ((float) cmdd / (float) 65500);
+        }
         qtmp2 = (float) ((float) speed2 / (float) 100);
         fooPID3.controlReference = Q15(qtmp1);
         fooPID3.measuredOutput = Q15(qtmp2);
         PID(&fooPID3);
         res2 = Fract2Float(fooPID3.controlOutput)*5000; //max speed 60 tics at pwm 5000
         //Av
-        qtmp1 = (float) ((float) cmdd / (float) 65500);
+        if ( ! modbus.enable) {
+            qtmp1 = (float) ((float) cmdg / (float) 250); // mode 8b
+        }
+        else {
+            qtmp1 = (float) ((float) cmdg / (float) 65500);
+        }
         qtmp2 = (float) ((float) speed4 / (float) 100);
         fooPID4.controlReference = Q15(qtmp1);
         fooPID4.measuredOutput = Q15(qtmp2);
